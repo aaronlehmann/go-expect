@@ -19,6 +19,7 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"runtime"
 	"time"
 	"unicode/utf8"
 )
@@ -38,7 +39,22 @@ func (c *Console) ExpectString(s string) (string, error) {
 // ExpectEOF reads from Console's tty until EOF or an error occurs, and returns
 // the buffer read by Console.  We also treat the PTSClosed error as an EOF.
 func (c *Console) ExpectEOF() (string, error) {
-	return c.Expect(EOF, PTSClosed)
+	s, err := c.Expect(EOF, PTSClosed)
+	if err != nil {
+		buf := make([]byte, 1024)
+		for {
+			n := runtime.Stack(buf, true)
+			if n < len(buf) {
+				buf = buf[:n]
+				break
+			}
+			buf = make([]byte, 2*len(buf))
+		}
+
+		// Use a panic since we don't have a testing.T here for t.Log()
+		panic(fmt.Sprintf("ExpectEOF error %s: \n%s", err, buf))
+	}
+	return s, err
 }
 
 // Expect reads from Console's tty until a condition specified from opts is
